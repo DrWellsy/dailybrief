@@ -4,16 +4,8 @@ import os
 from importlib import import_module
 from types import ModuleType
 
+from dailybrief.i18n import DEFAULT_LANG, get_message, get_system_prompt
 from dailybrief.reader import Note
-
-SYSTEM_PROMPT = (
-    "Sen bir asistan olarak notlari kisa bir gunluk brifinge donustur. "
-    "Girdi notlari Turkce ve Ingilizce karisik olabilir; her iki dili de anlayip tek bir tutarli ozette birlestir. "
-    "Ciktiyi sadece Turkce ver. Cikti iki bolumden olussun:\n"
-    "1) Bugun Oncelikli 3-5 Madde\n"
-    "2) Unutulmamasi Gerekenler\n"
-    "Kisa, uygulanabilir ve tekrar etmeyen maddeler yaz."
-)
 
 
 def _load_anthropic() -> ModuleType:
@@ -25,55 +17,50 @@ def _load_anthropic() -> ModuleType:
         ) from exc
 
 
-def generate_brief(notes: list[Note]) -> str:
+def generate_brief(notes: list[Note], lang: str = DEFAULT_LANG) -> str:
     if not notes:
-        raise RuntimeError("Ozet uretmek icin not bulunamadi.")
+        raise RuntimeError(get_message(lang, "no_notes_for_summary"))
 
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY bulunamadi. Once API anahtarini ayarlayin:\n"
-            "PowerShell: $env:ANTHROPIC_API_KEY='your_api_key'\n"
-            "cmd.exe: set ANTHROPIC_API_KEY=your_api_key"
-        )
+        raise RuntimeError(get_message(lang, "api_key_missing_error"))
 
     notes_payload = "\n\n".join(
-        [f"Dosya: {note.name}\nIcerik:\n{note.content}" for note in notes]
+        [f"Dosya / File: {note.name}\nIcerik / Content:\n{note.content}" for note in notes]
     )
 
     anthropic = _load_anthropic()
     client = anthropic.Anthropic(api_key=api_key)
 
+    user_instructions = {
+        "en": "Analyze the following notes and generate the requested two-section daily briefing:\n\n",
+        "tr": "Asagidaki notlari analiz et ve istenen iki bolumlu kisa brifingi uret:\n\n",
+    }
+    user_prompt_prefix = user_instructions.get(lang.lower(), user_instructions[DEFAULT_LANG])
+
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=700,
-            system=SYSTEM_PROMPT,
+            system=get_system_prompt(lang),
             messages=[
                 {
                     "role": "user",
-                    "content": (
-                        "Asagidaki notlari analiz et ve istenen iki bolumlu kisa brifingi uret:\n\n"
-                        f"{notes_payload}"
-                    ),
+                    "content": f"{user_prompt_prefix}{notes_payload}",
                 }
             ],
         )
     except anthropic.RateLimitError as exc:
-        raise RuntimeError(
-            "Anthropic API rate limit hatasi. Biraz bekleyip tekrar deneyin."
-        ) from exc
+        raise RuntimeError(get_message(lang, "rate_limit_error")) from exc
     except anthropic.APIConnectionError as exc:
-        raise RuntimeError(
-            "Anthropic API baglanti hatasi. Internet baglantinizi ve ag erisiminizi kontrol edin."
-        ) from exc
+        raise RuntimeError(get_message(lang, "connection_error")) from exc
     except anthropic.APIError as exc:
-        raise RuntimeError(f"Anthropic API hatasi: {exc}") from exc
+        raise RuntimeError(get_message(lang, "api_error", error=str(exc))) from exc
 
     text_parts = [block.text for block in response.content if hasattr(block, "text")]
     brief = "\n".join(text_parts).strip()
 
     if not brief:
-        raise RuntimeError("Anthropic API bos bir ozet dondu.")
+        raise RuntimeError(get_message(lang, "empty_brief_error"))
 
     return brief

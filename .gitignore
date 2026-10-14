@@ -41,6 +41,7 @@ Thumbs.db
 # Generated briefing and task exports
 brief-*.md
 tasks-*.md
+eod-*.md
 *.log
 *.mp3
 *.wav

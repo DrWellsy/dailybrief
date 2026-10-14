@@ -38,6 +38,7 @@ class AppConfig:
     voice_provider: str = "auto"
     voice_name: str = "alloy"
     watched_repos: list[str] = field(default_factory=list)
+    redact_pii: bool = False
 
 
 def load_config(config_path: Path | None = None) -> AppConfig:
@@ -64,6 +65,7 @@ def load_config(config_path: Path | None = None) -> AppConfig:
     ollama_host = str(data.get("ollama_host", "http://localhost:11434")).strip()
     voice_provider = str(data.get("voice_provider", "auto")).strip().lower()
     voice_name = str(data.get("voice_name", "alloy")).strip()
+    redact_pii = bool(data.get("redact_pii", False))
 
     repos_raw = data.get("watched_repos", [])
     watched_repos = [str(r).strip() for r in repos_raw if str(r).strip()] if isinstance(repos_raw, list) else []
@@ -80,6 +82,7 @@ def load_config(config_path: Path | None = None) -> AppConfig:
         voice_provider=voice_provider,
         voice_name=voice_name,
         watched_repos=watched_repos,
+        redact_pii=redact_pii,
     )
 
 
@@ -109,6 +112,8 @@ def save_config(config: AppConfig, config_path: Path | None = None) -> Path:
         lines.append(f"voice_provider = {json.dumps(config.voice_provider)}")
     if config.voice_name:
         lines.append(f"voice_name = {json.dumps(config.voice_name)}")
+    if config.redact_pii:
+        lines.append(f"redact_pii = {json.dumps(config.redact_pii)}")
     if config.watched_repos:
         repos_json = json.dumps(config.watched_repos)
         lines.append(f"watched_repos = {repos_json}")

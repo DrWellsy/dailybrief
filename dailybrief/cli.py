@@ -46,7 +46,18 @@ from dailybrief.mcp_server import run_mcp_server
 from dailybrief.memory import load_recent_history, save_history_entry
 from dailybrief.providers import get_provider
 from dailybrief.reader import read_notes
-from dailybrief.summarizer import break_down_task, generate_brief, refine_brief
+from dailybrief.security import render_security_badge
+from dailybrief.summarizer import (
+    break_down_task,
+    generate_brief,
+    generate_brief_with_telemetry,
+    refine_brief,
+)
+from dailybrief.telemetry import (
+    TelemetryData,
+    estimate_tokens,
+    render_telemetry_footer,
+)
 from dailybrief.voice import (
     generate_voice_script,
     play_audio_file,
@@ -213,6 +224,30 @@ def _ensure_api_key(
     default=False,
     help="Sistem tanilamasi / Run system self-diagnostics.",
 )
+@click.option(
+    "--redact-pii",
+    is_flag=True,
+    default=False,
+    help="Hassas verilere ek olarak e-posta ve IP adreslerini de sansurler / Mask email and IP addresses.",
+)
+@click.option(
+    "--no-todos",
+    is_flag=True,
+    default=False,
+    help="Kod ici TODO/FIXME satirlarini taramayi devre disi birakir / Disable codebase TODO/FIXME scanning.",
+)
+@click.option(
+    "--weekly",
+    is_flag=True,
+    default=False,
+    help="Haftalik sprint retrospektifi ve hiz puani / Generate weekly sprint retrospective and velocity scorecard.",
+)
+@click.option(
+    "--init-shell",
+    type=click.Choice(["bash", "zsh", "powershell", "fish"], case_sensitive=False),
+    default=None,
+    help="Terminal baslangic kancasi uretir / Generate shell startup auto-briefing hook.",
+)
 def main(
     source: Path,
     lang: str,
@@ -230,9 +265,21 @@ def main(
     unschedule: bool = False,
     background: bool = False,
     doctor: bool = False,
+    redact_pii: bool = False,
+    no_todos: bool = False,
+    weekly: bool = False,
+    init_shell: str | None = None,
 ) -> None:
     """Kisisel yapay zeka asistaniniz / Your personal executive developer assistant."""
     lang = lang.lower()
+
+    # 0. Shell Auto-Greeting Hook Mode
+    if init_shell:
+        from dailybrief.shell_hook import generate_shell_hook
+
+        hook_code = generate_shell_hook(init_shell)
+        console.print(hook_code)
+        return
 
     # 1. MCP Mode: run stdio server immediately
     if mcp:
@@ -352,6 +399,41 @@ def main(
         return
 
     # ----------------------------------------------------
+    # Weekly Sprint Retrospective & Velocity Engine Mode
+    # ----------------------------------------------------
+    if weekly:
+        from dailybrief.weekly import (
+            format_weekly_standup,
+            generate_weekly_report,
+            render_weekly_panel,
+        )
+
+        report = generate_weekly_report(
+            days=7,
+            repos=repos_to_check if repos_to_check else None,
+            source_dir=source if source.is_dir() else None,
+            lang=lang,
+        )
+        console.print(render_weekly_panel(report, lang=lang))
+
+        if sys.stdin.isatty():
+            console.print()
+            prompt_hint = (
+                "[c] Haftalık standup'ı panoya kopyala  •  [Enter] Çık"
+                if lang == "tr"
+                else "[c] Copy Weekly Standup to clipboard  •  [Enter] Exit"
+            )
+            console.print(Text(prompt_hint, style="bold cyan"))
+            c_input = click.prompt(">>", default="", show_default=False).strip().lower()
+            if c_input == "c":
+                standup_text = format_weekly_standup(report, lang=lang)
+                if copy_to_clipboard(standup_text):
+                    console.print(Text("OK: " + get_message(lang, "clipboard_success"), style="green"))
+                else:
+                    console.print(Text("WARN: " + get_message(lang, "clipboard_failure"), style="yellow"))
+        return
+
+    # ----------------------------------------------------
     # Morning / Standard Briefing Mode
     # ----------------------------------------------------
     active_provider_name = (provider or config.provider or "anthropic").lower()
@@ -428,6 +510,24 @@ def main(
             if blocker_panel:
                 console.print(blocker_panel)
 
+    # 5.5. Codebase Inline TODO/FIXME Harvester
+    codebase_todos = None
+    if not no_todos:
+        from dailybrief.todo_scanner import scan_codebase_todos
+
+        mod_files = git_context.modified_files if git_context else None
+        codebase_todos = scan_codebase_todos(
+            repos=repos_to_check if repos_to_check else None,
+            git_modified_files=mod_files,
+        )
+        if codebase_todos:
+            todo_summary = (
+                f"[Codebase] {len(codebase_todos)} inline TODO/FIXME items detected"
+                if lang == "en"
+                else f"[Kod Tabanı] {len(codebase_todos)} satır içi TODO/FIXME tespit edildi"
+            )
+            console.print(Text(todo_summary, style="dim magenta"))
+
     # 6. Smart Content-Hash Caching & Token Optimization
     from dailybrief.cache import (
         CacheEntry,
@@ -453,12 +553,23 @@ def main(
 
     brief: str | None = None
     loaded_from_cache = False
+    telemetry: TelemetryData | None = None
 
     if not force:
         cached_entry = get_cached_brief(state_hash, today)
         if cached_entry is not None:
             brief = cached_entry.brief
             loaded_from_cache = True
+            telemetry = TelemetryData(
+                provider=active_provider_name,
+                model=active_model or "default",
+                input_tokens=0,
+                output_tokens=estimate_tokens(brief),
+                latency_seconds=0.015,
+                estimated_cost_usd=0.0,
+                redactions_count=0,
+                loaded_from_cache=True,
+            )
 
     if brief is None:
         # Resolve API Key & Provider
@@ -476,15 +587,18 @@ def main(
         except (RuntimeError, ValueError) as exc:
             raise click.ClickException(str(exc)) from exc
 
-        # 7. Generate Brief with LLM
+        # 7. Generate Brief with LLM & DLP Security Firewall
+        should_redact_pii = redact_pii or config.redact_pii
         try:
-            brief = generate_brief(
+            brief, telemetry = generate_brief_with_telemetry(
                 notes,
                 lang=lang,
                 git_context=git_context,
                 history=history_entries,
                 provider=llm_provider,
                 model=active_model,
+                todos=codebase_todos,
+                redact_pii=should_redact_pii,
             )
         except RuntimeError as exc:
             raise click.ClickException(str(exc)) from exc
@@ -507,6 +621,11 @@ def main(
             pass
 
     # 8. Output Panel
+    if telemetry and telemetry.redactions_count > 0:
+        sec_badge = render_security_badge(telemetry.redactions_count, lang=lang)
+        if sec_badge:
+            console.print(sec_badge)
+
     panel_title = get_message(lang, "panel_title")
     console.print(
         Panel(
@@ -521,6 +640,9 @@ def main(
 
     if loaded_from_cache:
         console.print(render_cache_badge(lang))
+
+    if telemetry:
+        console.print(render_telemetry_footer(telemetry, lang=lang))
 
     # 9. Save to Persistent Memory
     try:

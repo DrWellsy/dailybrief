@@ -8,7 +8,8 @@ Turn scattered daily notes, multi-repo Git activity, and persistent priorities i
 [Türkçe Dokümantasyon (Turkish README)](README.tr.md) • [Report Bug](https://github.com/DrWellsy/dailybrief/issues) • [Request Feature](https://github.com/DrWellsy/dailybrief/issues)
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/version-0.2.0-emerald)](https://github.com/DrWellsy/dailybrief)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
+[![Version](https://img.shields.io/badge/version-0.3.0-emerald)](https://github.com/DrWellsy/dailybrief)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-red)](https://github.com/sponsors/DrWellsy)
 
@@ -25,6 +26,11 @@ Turn scattered daily notes, multi-repo Git activity, and persistent priorities i
 As developers and builders, our work is fragmented across scratchpads, multiple Git repositories, and yesterday's deferred items. Reviewing 10 different files while recalling what you committed yesterday takes too much cognitive load before your first coffee.
 
 **DailyBrief** is an autonomous terminal agent:
+- 🛡️ **Local DLP & Secret Redaction Firewall:** Never leak credentials! Scans notes and git diffs before LLM transit, automatically neutralizing API keys (`sk-...`, `ghp_...`, `AIza...`), JWTs, database URLs, and private keys.
+- 🔍 **Codebase `TODO` / `FIXME` Harvester:** Automatically scans inline comments in your code (`TODO:`, `FIXME:`, `HACK:`) prioritizing recently modified files so tasks in code never slip through the cracks.
+- 📊 **Smart Context Budgeter & Cost Telemetry:** Truncates noisy lockfiles to prevent context overflow; prints a sleek footer showing exact latency (`⏱️ 1.2s`), token usage, and estimated USD cost (`💰 $0.0035`).
+- 📈 **Weekly Sprint Retrospective (`--weekly`):** Synthesizes the last 7 days of Git commits and briefings into a Developer Velocity Score (%) and ready-to-share Friday sprint summary.
+- 🚀 **Shell Auto-Greeting Hook (`--init-shell`):** Runs DailyBrief only once per day on your first morning terminal launch (0ms overhead on all subsequent tabs).
 - 📦 **Zero-Python Standalone Binary:** Run anywhere on Windows (`.exe`), macOS, or Linux without needing Python installed.
 - ⚡ **Sub-Second Parallel Engine & Zero-Token Smart Caching:** Parallel multi-file note ingestion & multi-repo Git inspection. Deterministic SHA-256 state caching serves instant briefings with `⚡ Loaded from instant cache (0 tokens used)`.
 - ⏰ **Autonomous Background Scheduler (`--schedule 08:45`):** Automatically runs via native OS task scheduler (Windows Task Scheduler / cron), pre-warms cache, and sends native desktop notifications before you start work.
@@ -35,7 +41,7 @@ As developers and builders, our work is fragmented across scratchpads, multiple 
 - ⚡ **Predictive Git Conflict & Upstream Radar:** Safely inspects upstream divergence (`HEAD..@{u}` / `origin/main`) without modifying working files, warning you of conflicting file edits before they become merge disasters.
 - 🎙️ **Executive Voice Briefing (`--voice`):** Synthesizes a natural, conversational 30–45s spoken summary with smooth terminal audio playback for your morning coffee routine.
 - 🐙 **Multi-Repo Git Sensing:** Watches one or multiple local repositories (`-g /path/to/repo`), aggregating branch status, recent commits (last 48h), and uncommitted working changes.
-- ⚠️ **Chronic Blocker & Carry-Over Engine:** Cross-references priorities from consecutive days (last 3–5 history entries) with Git activity. If a task has lingered for 2+ days with zero commits, DailyBrief flags it with concrete unblocking advice.
+- ⚠️ **Chronic Blocker & Carry-Over Engine:** Cross-references priorities from consecutive days with Git activity, flagging lingering tasks with concrete unblocking advice.
 - ⚡ **True Agentic Interactive Loop (`-i`):**
   - **`[c]` Copy Standup:** Copy clean, formatted bullet points to your clipboard for Slack / Teams.
   - **`[s]` Save Markdown:** Export briefing to `brief-YYYY-MM-DD.md`.
@@ -329,6 +335,10 @@ dailybrief [OPTIONS]
 | `--unschedule` | Remove active autonomous scheduled task | `false` |
 | `--background` | Run in background mode with desktop notification | `false` |
 | `--doctor` | Run comprehensive system self-diagnostics | `false` |
+| `--redact-pii` | Mask email and IP addresses in addition to credentials | `false` |
+| `--no-todos` | Disable codebase inline `TODO`/`FIXME` scanning | `false` |
+| `--weekly` | Generate weekly sprint retrospective and velocity scorecard | `false` |
+| `--init-shell <SHELL>` | Generate non-blocking shell auto-greeting hook (`bash`, `zsh`, `powershell`, `fish`) | `None` |
 | `--no-git` | Disable Git activity sensing | `false` |
 | `--no-history` | Disable previous briefing memory & blocker engine | `false` |
 | `-h, --help` | Show command line options and exit | |
@@ -337,7 +347,7 @@ dailybrief [OPTIONS]
 
 ## 🧪 Testing
 
-Run the full 99+ unit test suite:
+Run the full 136+ unit test suite:
 
 ```bash
 pytest

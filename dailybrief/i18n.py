@@ -65,6 +65,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "unschedule_help": "Remove active autonomous morning briefing schedule.",
         "background_help": "Run silent background briefing, pre-warm cache, and send desktop notification.",
         "doctor_help": "Run system self-diagnostics for config, API keys, Git repos, and cache.",
+        "redact_pii_help": "Mask email and IP addresses in notes in addition to credentials.",
+        "no_todos_help": "Disable scanning codebase inline TODO/FIXME comments.",
+        "weekly_help": "Generate weekly sprint retrospective and velocity scorecard.",
+        "init_shell_help": "Generate shell auto-greeting hook for bash, zsh, powershell, or fish.",
     },
     "tr": {
         "date_label": "Tarih",
@@ -127,6 +131,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "unschedule_help": "Zamanlanmış otonom sabah brifingi görevini kaldırır.",
         "background_help": "Sessiz arka plan modunda çalışır, önbelleği ısıtır ve masaüstü bildirimi gönderir.",
         "doctor_help": "Sistem tanılamasını çalıştırarak yapılandırma, API anahtarları, Git ve önbelleği kontrol eder.",
+        "redact_pii_help": "Kimlik bilgilerine ek olarak e-posta ve IP adreslerini de sansürler.",
+        "no_todos_help": "Kod içi TODO/FIXME yorumlarını taramayı devre dışı bırakır.",
+        "weekly_help": "Haftalık sprint retrospektifi ve hız puan kartı üretir.",
+        "init_shell_help": "bash, zsh, powershell veya fish için kabuk otomatik selamlama kancası üretir.",
     },
 }
 

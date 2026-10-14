@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from types import ModuleType
 
 from dailybrief.git_context import GitContext
@@ -8,20 +9,30 @@ from dailybrief.i18n import DEFAULT_LANG, get_message, get_system_prompt
 from dailybrief.memory import HistoryEntry, format_history_for_prompt
 from dailybrief.providers import AnthropicProvider, LLMProvider, _load_anthropic as _providers_load_anthropic
 from dailybrief.reader import Note
+from dailybrief.security import redact_secrets
+from dailybrief.telemetry import (
+    TelemetryData,
+    calculate_cost,
+    enforce_context_budget,
+    estimate_tokens,
+)
+from dailybrief.todo_scanner import TodoItem, format_todos_for_prompt
 
 
 def _load_anthropic() -> ModuleType:
     return _providers_load_anthropic()
 
 
-def generate_brief(
+def generate_brief_with_telemetry(
     notes: list[Note],
     lang: str = DEFAULT_LANG,
     git_context: GitContext | None = None,
     history: list[HistoryEntry] | None = None,
     provider: LLMProvider | None = None,
     model: str | None = None,
-) -> str:
+    todos: list[TodoItem] | None = None,
+    redact_pii: bool = False,
+) -> tuple[str, TelemetryData]:
     if not notes:
         raise RuntimeError(get_message(lang, "no_notes_for_summary"))
 
@@ -45,22 +56,78 @@ def generate_brief(
             header = "GİT GELİŞTİRİCİ DURUMU / GIT REPO CONTEXT:"
             payload_sections.append(f"{header}\n{git_text}")
 
+    if todos:
+        todos_text = format_todos_for_prompt(todos, lang=lang)
+        if todos_text:
+            payload_sections.append(todos_text)
+
     notes_payload = "\n\n".join(
         [f"Dosya / File: {note.name}\nIcerik / Content:\n{note.content}" for note in notes]
     )
     payload_sections.append(f"GÜNCEL NOTLAR / TODAY'S NOTES:\n{notes_payload}")
 
-    full_payload = "\n\n--------------------\n\n".join(payload_sections)
+    raw_payload = "\n\n--------------------\n\n".join(payload_sections)
+
+    # 1. Local DLP & Secret Redaction Firewall
+    redaction = redact_secrets(raw_payload, redact_pii=redact_pii)
+    sanitized_payload = redaction.text
+
+    # 2. Context Budget Guard
+    budgeted_payload, budget_capped = enforce_context_budget(sanitized_payload)
 
     user_instructions = {
         "en": "Analyze the following developer notes, git context, and previous memory to generate the requested two-section daily briefing:\n\n",
         "tr": "Aşağıdaki notları, git durumunu ve geçmiş brifing hafızasını analiz ederek istenen iki bölümlü kısa brifingi üret:\n\n",
     }
     user_prompt_prefix = user_instructions.get(lang.lower(), user_instructions[DEFAULT_LANG])
-    user_prompt = f"{user_prompt_prefix}{full_payload}"
+    user_prompt = f"{user_prompt_prefix}{budgeted_payload}"
     system_prompt = get_system_prompt(lang)
 
-    return active_provider.generate(system_prompt=system_prompt, user_prompt=user_prompt, model=model)
+    start_time = time.perf_counter()
+    brief = active_provider.generate(system_prompt=system_prompt, user_prompt=user_prompt, model=model)
+    elapsed = max(0.001, time.perf_counter() - start_time)
+
+    active_model = model or getattr(active_provider, "default_model", active_provider.name)
+    input_tokens = estimate_tokens(system_prompt + "\n" + user_prompt)
+    output_tokens = estimate_tokens(brief)
+    cost = calculate_cost(active_model, input_tokens, output_tokens)
+
+    telemetry = TelemetryData(
+        provider=active_provider.name,
+        model=active_model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        latency_seconds=elapsed,
+        estimated_cost_usd=cost,
+        redactions_count=redaction.redacted_count,
+        loaded_from_cache=False,
+        budget_truncated=budget_capped,
+    )
+
+    return brief, telemetry
+
+
+def generate_brief(
+    notes: list[Note],
+    lang: str = DEFAULT_LANG,
+    git_context: GitContext | None = None,
+    history: list[HistoryEntry] | None = None,
+    provider: LLMProvider | None = None,
+    model: str | None = None,
+    todos: list[TodoItem] | None = None,
+    redact_pii: bool = False,
+) -> str:
+    brief, _ = generate_brief_with_telemetry(
+        notes=notes,
+        lang=lang,
+        git_context=git_context,
+        history=history,
+        provider=provider,
+        model=model,
+        todos=todos,
+        redact_pii=redact_pii,
+    )
+    return brief
 
 
 def break_down_task(

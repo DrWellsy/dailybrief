@@ -8,7 +8,8 @@ Dağınık günlük notlarınızı, çoklu Git aktivitelerinizi ve dünden devre
 [English Documentation (İngilizce README)](README.md) • [Hata Bildir](https://github.com/DrWellsy/dailybrief/issues) • [Özellik İste](https://github.com/DrWellsy/dailybrief/issues)
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/version-0.2.0-emerald)](https://github.com/DrWellsy/dailybrief)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
+[![Version](https://img.shields.io/badge/version-0.3.0-emerald)](https://github.com/DrWellsy/dailybrief)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-red)](https://github.com/sponsors/DrWellsy)
 
@@ -25,6 +26,11 @@ Dağınık günlük notlarınızı, çoklu Git aktivitelerinizi ve dünden devre
 Geliştiriciler olarak çalışmalarımız gün içinde dağılır: hızlı karalama notları, birden fazla Git deposu ve dünden devreden ertelenmiş maddeler. Sabah masanın başına geçtiğinizde kahvenizi yudumlamadan önce 10 farklı dosyayı ve dünkü commit'leri hatırlamaya çalışmak ciddi bir zihinsel yorgunluk yaratır.
 
 **DailyBrief**, terminalinizde çalışan otonom bir geliştirici ajanıdır:
+- 🛡️ **Yerel DLP ve Gizli Bilgi Güvenlik Duvarı:** Asla dışarıya API anahtarı veya şifre sızdırmaz! Notlardaki ve git diff'lerindeki API anahtarlarını (`sk-...`, `ghp_...`, `AIza...`), JWT token'larını, veritabanı bağlantı adreslerini ve özel SSH anahtarlarını LLM'e iletmeden önce otomatik sansürler.
+- 🔍 **Kod İçi `TODO` / `FIXME` Hasadı:** Kod dosyalarındaki satır içi yorumları (`TODO:`, `FIXME:`, `HACK:`) son değiştirilen dosyalara öncelik vererek tarar ve günlük brifinge dahil eder (`--no-todos` ile kapatılabilir).
+- 📊 **Akıllı Bağlam Bütçesi & Maliyet/Gecikme Telemetrisi:** Büyük lockfile farklarını kırparak bağlam taşmasını önler; brifingin altında kesin gecikme (`⏱️ 1.2s`), tahmini token ve dolar maliyetini (`💰 $0.0035`) gösterir.
+- 📈 **Haftalık Sprint Retrospektifi (`--weekly`):** Son 7 günün Git commit'lerini ve brifing hafızasını analiz ederek Geliştirici Hız Skorunu (%) ve Cuma günleri yöneticinizle paylaşabileceğiniz haftalık standup özetini üretir (`[c]` ile kopyalama).
+- 🚀 **Kabuk Otomatik Selamlama Kancası (`--init-shell`):** Sabah terminalinizi ilk açtığınızda günde sadece bir kez brifingi çalıştırır (sonraki sekmelerde 0ms gecikme).
 - 📦 **Python Gerektirmeyen Bağımsız İkili Dosya:** Windows (`.exe`), macOS veya Linux üzerinde Python veya sanal ortam kurmaya gerek kalmadan tek tıkla çalıştırın.
 - ⚡ **Saniyeden Hızlı Paralel Motor & Sıfır Token Akıllı Önbellek:** Çoklu not dosyalarını ve Git depolarını eşzamanlı iş parçacıklarıyla okur. Deterministik SHA-256 durum önbelleği sayesinde girdi değişmediğinde brifingi 50ms altında `⚡ Anlık önbellekten yüklendi (0 token kullanıldı)` rozetiyle sunar.
 - ⏰ **Otonom Sabah Zamanlayıcısı (`--schedule 08:45`):** Bilgisayarınızı açtığınızda sabah brifinginizi hazır eder; yerel işletim sistemi görev zamanlayıcısını kullanarak önbelleği ısıtır ve yerel masaüstü bildirimi gönderir.
@@ -330,6 +336,10 @@ dailybrief [SEÇENEKLER]
 | `--unschedule` | Zamanlanmış otonom görevi kaldırır | `false` |
 | `--background` | Sessiz arka plan modunda çalışır ve masaüstü bildirimi gönderir | `false` |
 | `--doctor` | Kapsamlı sistem tanılamasını çalıştırır | `false` |
+| `--redact-pii` | Kimlik bilgilerine ek olarak e-posta ve IP adreslerini de sansürler | `false` |
+| `--no-todos` | Kod içi `TODO`/`FIXME` yorumlarını taramayı devre dışı bırakır | `false` |
+| `--weekly` | Haftalık sprint retrospektifi ve hız puan kartı üretir | `false` |
+| `--init-shell <KABUK>` | Kabuk otomatik selamlama kancası üretir (`bash`, `zsh`, `powershell`, `fish`) | `None` |
 | `--no-git` | Otomatik Git durumu ve commit taramasını kapatır | `false` |
 | `--no-history` | Önceki günlerin brifing hafızasını ve tıkanıklık takibini kapatır | `false` |
 | `-h, --help` | Yardım mesajını gösterir | |
@@ -338,7 +348,7 @@ dailybrief [SEÇENEKLER]
 
 ## 🧪 Testler
 
-99'dan fazla birim testini çalıştırmak için:
+136'dan fazla birim testini çalıştırmak için:
 
 ```bash
 pytest

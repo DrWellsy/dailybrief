@@ -79,6 +79,16 @@ def build() -> int:
         "dailybrief.eod",
         "--hidden-import",
         "dailybrief.git_radar",
+        "--hidden-import",
+        "dailybrief.security",
+        "--hidden-import",
+        "dailybrief.todo_scanner",
+        "--hidden-import",
+        "dailybrief.telemetry",
+        "--hidden-import",
+        "dailybrief.weekly",
+        "--hidden-import",
+        "dailybrief.shell_hook",
         str(entry_point),
     ]
 

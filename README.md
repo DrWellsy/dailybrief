@@ -2,8 +2,8 @@
 
 # ⚡ DailyBrief
 
-**Your personal AI executive assistant in the terminal.**  
-Turn messy daily notes, sprint items, and thoughts into a crisp, high-signal briefing.
+**Your personal AI executive developer assistant in the terminal.**  
+Turn messy daily notes, git activity, and sprint tasks into a crisp, high-signal briefing with persistent memory.
 
 [Türkçe Dokümantasyon (Turkish README)](README.tr.md) • [Report Bug](https://github.com/DrWellsy/dailybrief/issues) • [Request Feature](https://github.com/DrWellsy/dailybrief/issues)
 
@@ -21,14 +21,13 @@ Turn messy daily notes, sprint items, and thoughts into a crisp, high-signal bri
 
 ## 💡 Why DailyBrief?
 
-As developers and builders, we scatter notes everywhere: quick scratchpads, sprint priorities, Jira task copies, and end-of-day reminders. When the day starts, reviewing 10 different files takes too much cognitive load.
+As developers and builders, we scatter notes everywhere: quick scratchpads, sprint priorities, Jira copies, and end-of-day reminders. When the day starts, reviewing 10 different files while recalling what you committed yesterday takes too much cognitive load.
 
-**DailyBrief** scans your local notes folder (Markdown `.md` and plain text `.txt`), analyzes them with Anthropic's Claude, and compiles an executive terminal briefing in seconds:
-
-- **Key Priorities for Today** (3–5 actionable tasks you must tackle first)
-- **Things Not to Forget / Follow-ups** (deadlines, meetings, customer follow-ups)
-
-Even if your notes are written in a mix of Turkish and English, DailyBrief understands both seamlessly and outputs a coherent briefing in your preferred language (`--lang en` or `--lang tr`).
+**DailyBrief** acts as your personal terminal agent:
+- 📂 **Multi-Source Ingestion:** Scans your local notes (`.md` & `.txt`) whether written in English, Turkish, or a mix.
+- 🐙 **Git Context Sensing:** Automatically inspects active branch, recent commits (last 48h), and uncommitted working changes.
+- 🧠 **Persistent Memory & Accountability:** Remembers yesterday's briefing to detect postponed or carried-over priorities.
+- ⚡ **Interactive Terminal Actions:** One-click copy formatted standup updates to your clipboard (`[c]`) or export to Markdown (`[s]`).
 
 ---
 
@@ -39,7 +38,7 @@ Even if your notes are written in a mix of Turkish and English, DailyBrief under
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/Aloostor/dailybrief.git
+git clone https://github.com/DrWellsy/dailybrief.git
 cd dailybrief
 pip install -r requirements.txt
 ```
@@ -52,7 +51,7 @@ pip install -e .
 
 ### 2. Configure Your API Key
 
-DailyBrief requires an Anthropic API key (`ANTHROPIC_API_KEY`).
+DailyBrief uses Anthropic's Claude (`ANTHROPIC_API_KEY`).
 
 **Linux / macOS:**
 ```bash
@@ -64,27 +63,20 @@ export ANTHROPIC_API_KEY="your_api_key_here"
 $env:ANTHROPIC_API_KEY="your_api_key_here"
 ```
 
-**Windows (Command Prompt):**
-```cmd
-set ANTHROPIC_API_KEY=your_api_key_here
-```
-
-> **First Run Prompt:** If no environment variable is found, the CLI interactively prompts for your key and safely stores it locally in `~/.dailybrief/config.toml`.
+> **Interactive Setup:** If no environment variable is found, DailyBrief prompts for your key on first run and securely saves it locally in `~/.dailybrief/config.toml`.
 
 ---
 
-## 💻 Usage
-
-Run against the default `./notes` folder:
+## 💻 Usage & Flags
 
 ```bash
-python -m dailybrief
+dailybrief [OPTIONS]
 ```
 
-Or if installed via `pip install -e .`:
+Or via Python module:
 
 ```bash
-dailybrief
+python -m dailybrief [OPTIONS]
 ```
 
 ### Options & Flags
@@ -93,73 +85,60 @@ dailybrief
 |------|-------------|---------|
 | `-s, --source <PATH>` | Directory containing `.md` and `.txt` notes | `./notes` |
 | `-l, --lang <en\|tr>` | Output and interface language | `en` |
+| `-i, --interactive` | Prompt for actions after briefing (copy standup, export) | `false` |
+| `--no-git` | Disable automatic git branch & commit scanning | `false` |
+| `--no-history` | Disable previous briefing memory & follow-up tracking | `false` |
 | `-h, --help` | Show command line options and exit | |
 
 #### Examples
 
-**Generate a Turkish briefing from a custom notes folder:**
+**Start morning routine with full interactive actions:**
 ```bash
-dailybrief -s ~/Documents/ObsidianVault/Daily -l tr
+dailybrief -i
 ```
 
-**Specify language in module mode:**
+**Generate a Turkish briefing from a custom Obsidian vault:**
 ```bash
-python -m dailybrief --source ./my-notes --lang en
+dailybrief -s ~/Documents/ObsidianVault/Daily -l tr -i
 ```
 
 ---
 
-## 🛠️ Project Structure
+## 🧠 How the Agent Works
 
 ```text
-dailybrief/
-├── dailybrief/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── cli.py          # Click CLI & Rich terminal rendering
-│   ├── i18n.py         # Multi-language messages & system prompts (en/tr)
-│   ├── reader.py       # Robust note loader (UTF-8, Windows-1254 fallbacks)
-│   └── summarizer.py   # Anthropic Claude API integration
-├── notes/              # Sample markdown/txt notes
-├── scripts/
-│   └── generate_demo.py # Script to render modern demo.gif
-├── tests/              # Pytest test suite
-├── pyproject.toml
-└── demo.gif
+┌────────────────┐     ┌────────────────┐     ┌────────────────┐
+│ Local Notes    │     │ Git Repository │     │ Memory History │
+│ (.md & .txt)   │     │ (branch/status)│     │ (~/.dailybrief)│
+└───────┬────────┘     └───────┬────────┘     └───────┬────────┘
+        │                      │                      │
+        └───────────────► 🤖 DailyBrief ◄─────────────┘
+                               │
+                      Anthropic Claude Sonnet
+                               │
+                               ▼
+        ┌──────────────────────────────────────────────┐
+        │ ⚡ DailyBrief Executive Terminal Panel        │
+        │                                              │
+        │ 📌 Key Priorities for Today (3–5 items)      │
+        │ ⚡ Things Not to Forget / Follow-ups         │
+        └──────────────────────┬───────────────────────┘
+                               │
+            ┌──────────────────┴──────────────────┐
+            ▼                                     ▼
+     [c] Copy Standup                     [s] Export to Markdown
+     (System Clipboard)                   (brief-YYYY-MM-DD.md)
 ```
 
 ---
 
 ## 🧪 Testing
 
-Run test suite with `pytest`:
+Run the full unit test suite with `pytest`:
 
 ```bash
 pytest
 ```
-
----
-
-## 🎨 Regenerating the Demo GIF
-
-The demo animation in this repository is built using a standalone PIL-based terminal renderer with pixel-perfect Rich UI styling:
-
-```bash
-python scripts/generate_demo.py
-```
-
----
-
-## 🤝 Contributing
-
-Contributions, feedback, and ideas are warmly welcomed!
-Feel free to open an issue or submit a pull request.
-
-1. Fork the repo
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ---
 

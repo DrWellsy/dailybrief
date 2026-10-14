@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from dailybrief.git_context import GitContext
 from dailybrief.i18n import get_message, get_system_prompt
+from dailybrief.memory import HistoryEntry
 from dailybrief.reader import Note
 import dailybrief.summarizer as summarizer
 from dailybrief.summarizer import generate_brief
@@ -90,6 +92,41 @@ def test_generate_brief_returns_text_tr(monkeypatch: pytest.MonkeyPatch) -> None
     result = generate_brief([Note(name="n.md", content="content")], lang="tr")
     assert result == "Türkçe Özet"
     assert "Türkçe" in fake_module.client.messages.last_kwargs["system"]
+
+
+def test_generate_brief_with_git_and_history(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+    fake_module = _FakeAnthropicModule(response_text="Integrated Brief")
+    monkeypatch.setattr(summarizer, "_load_anthropic", lambda: fake_module)
+
+    git_ctx = GitContext(
+        branch="main",
+        recent_commits=["abc1234 Initial commit"],
+        uncommitted_count=1,
+        modified_files=["cli.py"],
+    )
+    history = [
+        HistoryEntry(
+            date="2026-10-14",
+            brief="Yesterday brief",
+            lang="en",
+            notes_count=2,
+        )
+    ]
+
+    result = generate_brief(
+        [Note(name="n.md", content="content")],
+        lang="en",
+        git_context=git_ctx,
+        history=history,
+    )
+    assert result == "Integrated Brief"
+
+    user_content = fake_module.client.messages.last_kwargs["messages"][0]["content"]
+    assert "PREVIOUS BRIEFING MEMORY" in user_content
+    assert "Yesterday brief" in user_content
+    assert "GIT REPO CONTEXT" in user_content
+    assert "Active Git Branch: main" in user_content
 
 
 def test_generate_brief_rate_limit_error(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2,8 +2,8 @@
 
 # ⚡ DailyBrief
 
-**Terminalinizdeki kişisel yapay zeka asistanınız.**  
-Dağınık günlük notlarınızı, sprint maddelerinizi ve yapılacakları tek bakışta net bir brifinge dönüştürün.
+**Terminalinizdeki kişisel yapay zeka geliştirici asistanınız.**  
+Dağınık günlük notlarınızı, Git durumunuzu ve dünden devreden görevlerinizi tek bakışta net bir yönetici brifingine dönüştürün.
 
 [English Documentation (İngilizce README)](README.md) • [Hata Bildir](https://github.com/DrWellsy/dailybrief/issues) • [Özellik İste](https://github.com/DrWellsy/dailybrief/issues)
 
@@ -21,14 +21,13 @@ Dağınık günlük notlarınızı, sprint maddelerinizi ve yapılacakları tek 
 
 ## 💡 Neden DailyBrief?
 
-Geliştiriciler ve üreticiler olarak notlarımızı her yere dağıtırız: hızlı karalamalar, sprint öncelikleri, Jira notları, Obsidian sayfaları ve gün sonu hatırlatıcıları. Sabah masanın başına geçtiğinizde 10 farklı dosyayı tek tek okumak ciddi bir zihinsel yük yaratır.
+Geliştiriciler olarak sabah masanın başına geçtiğimizde en büyük vakit kaybı; dünden kalan notları, açık branch'leri, yarım kalan commit'leri ve ertelediğimiz maddeleri tek tek hatırlamaya çalışmaktır.
 
-**DailyBrief**, yerel not klasörünüzdeki Markdown (`.md`) ve düz metin (`.txt`) dosyalarını tarar, Anthropic Claude API ile analiz eder ve saniyeler içinde şık bir terminal brifingi sunar:
-
-- **Bugün Öncelikli 3–5 Madde** (İlk olarak odaklanmanız gereken aksiyonlar)
-- **Unutulmaması Gerekenler** (Toplantılar, teslim tarihleri, takip maddeleri)
-
-Notlarınız Türkçe ve İngilizce karışık olsa bile, DailyBrief içeriği pürüzsüzce anlar ve seçtiğiniz dilde (`--lang tr` veya `--lang en`) tek bir düzenli çıktıda özetler.
+**DailyBrief**, terminalinizde çalışan tam teşekküllü bir kişisel ajandır:
+- 📂 **Çoklu Kaynak:** `.md` ve `.txt` notlarınızı (Türkçe, İngilizce veya karışık) okur.
+- 🐙 **Git Durum Algısı:** Bulunduğunuz Git dalını (branch), son 48 saatteki commit'leri ve henüz commit edilmemiş yarım kalan değişiklikleri otomatik tespit eder.
+- 🧠 **Kalıcı Hafıza & Takip:** Dünün brifingini (`~/.dailybrief/history/`) hatırlayarak ertelenen veya devam eden işleri ön plana çıkarır.
+- ⚡ **Etkileşimli Terminal Aksiyonları:** Brifing bittiğinde tek tuşla Slack/Teams için Standup metnini panoya kopyalar (`[c]`) veya Markdown olarak kaydeder (`[s]`).
 
 ---
 
@@ -39,12 +38,12 @@ Notlarınız Türkçe ve İngilizce karışık olsa bile, DailyBrief içeriği p
 Projeyi klonlayın ve bağımlılıkları yükleyin:
 
 ```bash
-git clone https://github.com/Aloostor/dailybrief.git
+git clone https://github.com/DrWellsy/dailybrief.git
 cd dailybrief
 pip install -r requirements.txt
 ```
 
-*(Opsiyonel) CLI komutu olarak sisteme bağlamak için:*
+*(Opsiyonel) Komut satırına bağlamak için:*
 
 ```bash
 pip install -e .
@@ -52,7 +51,7 @@ pip install -e .
 
 ### 2. API Anahtarı Ayarı
 
-DailyBrief, Anthropic API anahtarına (`ANTHROPIC_API_KEY`) ihtiyaç duyar.
+DailyBrief, Anthropic Claude API anahtarına (`ANTHROPIC_API_KEY`) ihtiyaç duyar.
 
 **Linux / macOS:**
 ```bash
@@ -64,27 +63,20 @@ export ANTHROPIC_API_KEY="api_anahtariniz"
 $env:ANTHROPIC_API_KEY="api_anahtariniz"
 ```
 
-**Windows (Komut İstemi - CMD):**
-```cmd
-set ANTHROPIC_API_KEY=api_anahtariniz
-```
-
-> **İlk Çalıştırma:** Eğer ortam değişkeni tanımlı değilse, DailyBrief terminal üzerinden anahtarınızı güvenle ister ve `~/.dailybrief/config.toml` dosyasına kaydeder.
+> **Kolay Kurulum:** İlk çalıştırmada API anahtarı tanımlı değilse, terminalden anahtarınızı güvenle ister ve `~/.dailybrief/config.toml` dosyasına kaydeder.
 
 ---
 
-## 💻 Kullanım
-
-Varsayılan `./notes` klasörüyle çalıştırmak için:
+## 💻 Kullanım ve Seçenekler
 
 ```bash
-python -m dailybrief
+dailybrief [SEÇENEKLER]
 ```
 
-Veya sistem genelinde kuruluysa:
+Veya modül olarak:
 
 ```bash
-dailybrief
+python -m dailybrief [SEÇENEKLER]
 ```
 
 ### Parametreler ve Seçenekler
@@ -92,47 +84,57 @@ dailybrief
 | Parametre | Açıklama | Varsayılan |
 |-----------|----------|------------|
 | `-s, --source <YOL>` | Notların okunacağı klasör yolu | `./notes` |
-| `-l, --lang <en\|tr>` | Arayüz ve özet dili (`tr` veya `en`) | `en` |
-| `-h, --help` | Yardım mesajını ve parametreleri gösterir | |
+| `-l, --lang <en\|tr>` | Arayüz ve brifing dili (`tr` veya `en`) | `en` |
+| `-i, --interactive` | Brifing sonrası etkileşimli menüyü (kopyala, kaydet) açar | `false` |
+| `--no-git` | Otomatik Git durumu ve commit taramasını kapatır | `false` |
+| `--no-history` | Önceki günlerin brifing hafızasını kapatır | `false` |
+| `-h, --help` | Yardım mesajını gösterir | |
 
 #### Örnekler
 
-**Farklı bir not klasöründen Türkçe brifing almak:**
+**Sabah etkileşimli Türkçe brifing almak:**
 ```bash
-dailybrief -s ~/Documents/ObsidianVault/Daily -l tr
+dailybrief -l tr -i
 ```
 
-**Modül olarak çalıştırma:**
+**Özel bir Obsidian klasöründen brifing üretmek:**
 ```bash
-python -m dailybrief --source ./notlarim --lang tr
+dailybrief -s ~/Documents/ObsidianVault/Daily -l tr -i
 ```
 
 ---
 
-## 🛠️ Proje Mimarisi
+## 🧠 Ajan Nasıl Çalışır?
 
 ```text
-dailybrief/
-├── dailybrief/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── cli.py          # Click CLI & Rich terminal panelleri
-│   ├── i18n.py         # Çoklu dil mesajları ve sistem komutları (en/tr)
-│   ├── reader.py       # Not okuyucu (UTF-8, Windows-1254 desteği)
-│   └── summarizer.py   # Anthropic Claude API entegrasyonu
-├── notes/              # Örnek not dosyaları
-├── scripts/
-│   └── generate_demo.py # Modern demo.gif üretici script
-├── tests/              # Test paketi (pytest)
-├── pyproject.toml
-└── demo.gif
+┌────────────────┐     ┌────────────────┐     ┌────────────────┐
+│ Yerel Notlar   │     │ Git Deposu     │     │ Hafıza/Geçmiş  │
+│ (.md ve .txt)  │     │ (branch/durum) │     │ (~/.dailybrief)│
+└───────┬────────┘     └───────┬────────┘     └───────┬────────┘
+        │                      │                      │
+        └───────────────► 🤖 DailyBrief ◄─────────────┘
+                               │
+                      Anthropic Claude Sonnet
+                               │
+                               ▼
+        ┌──────────────────────────────────────────────┐
+        │ ⚡ DailyBrief Terminal Yönetici Paneli        │
+        │                                              │
+        │ 📌 Bugün Öncelikli 3–5 Madde                 │
+        │ ⚡ Unutulmaması Gerekenler & Takipler        │
+        └──────────────────────┬───────────────────────┘
+                               │
+            ┌──────────────────┴──────────────────┐
+            ▼                                     ▼
+     [c] Standup Kopyala                  [s] Markdown Kaydet
+     (Sistem Panosu)                      (brief-YYYY-MM-DD.md)
 ```
 
 ---
 
 ## 🧪 Testler
 
-Testleri çalıştırmak için:
+Test paketini çalıştırmak için:
 
 ```bash
 pytest
@@ -140,23 +142,6 @@ pytest
 
 ---
 
-## 🎨 Demo GIF'ini Yeniden Üretmek
-
-Projedeki demo animasyonu, Rich arayüzünü birebir simüle eden bağımsız bir PIL scripti ile oluşturulmuştur:
-
-```bash
-python scripts/generate_demo.py
-```
-
----
-
-## 🤝 Katkıda Bulunma
-
-Her türlü katkı, geri bildirim ve öneriye açığız!
-Hata bildirmek veya yeni bir özellik önermek için GitHub üzerinden issue açabilir veya PR gönderebilirsiniz.
-
----
-
 ## 📄 Lisans
 
-Bu proje MIT Lisansı altında sunulmaktadır. Ayrıntılar için [LICENSE](LICENSE) dosyasına göz atabilirsiniz.
+Bu proje MIT Lisansı altında sunulmaktadır. Ayrıntılar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.

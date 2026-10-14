@@ -68,8 +68,8 @@ def test_redact_jwt_and_bearer_token():
 
 def test_redact_database_url_with_credentials():
     raw = (
-        "Database is postgres://db_user:s3cr3t_p@ssw0rd@db.internal.company.com:5432/production\n"
-        "Mongo is mongodb+srv://admin:SuperSecret99@cluster0.mongodb.net/test"
+        "Database is postgres://db_user:s3cr3t_p@ssw0rd@db.internal.example.invalid:5432/production\n"
+        "Mongo is mongodb+srv://mock_admin:SuperSecret99@mock-cluster.example.invalid/test"
     )
     res = redact_secrets(raw)
     assert res.redacted_count == 2

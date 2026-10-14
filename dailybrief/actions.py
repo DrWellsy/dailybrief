@@ -47,3 +47,63 @@ def format_standup_text(brief: str, date_str: str, lang: str = "en") -> str:
     # Clean any excessive blank lines while preserving bullets
     lines = [line.strip() for line in brief.splitlines() if line.strip()]
     return prefix + "\n".join(lines)
+
+
+def generate_branch_name(task_text: str) -> str:
+    cleaned = re.sub(r"^(?:\d+[\.\)]|[\-\*\•])\s+", "", task_text.strip()).lower()
+
+    is_fix = any(w in cleaned for w in ("fix", "bug", "issue", "error", "patch", "sorun", "hata", "coz"))
+    prefix = "fix/" if is_fix else "feat/"
+
+    # Remove non-alphanumeric chars
+    words = re.findall(r"[a-z0-9]+", cleaned)
+    # Filter short stop words
+    filtered = [w for w in words if w not in {"the", "a", "an", "and", "or", "in", "on", "for", "with", "bir", "ve", "icin"}]
+    slug = "-".join(filtered[:5]) or "task-update"
+
+    if len(slug) > 30:
+        slug = slug[:30].rstrip("-")
+
+    return f"{prefix}{slug}"
+
+
+def checkout_branch(branch_name: str, repo_path: Path | str | None = None) -> tuple[bool, str]:
+    if not shutil.which("git"):
+        return False, "git command is not available."
+
+    cwd = str(repo_path) if repo_path else "."
+    try:
+        proc = subprocess.run(
+            ["git", "checkout", "-b", branch_name],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0:
+            return True, f"Switched to a new branch '{branch_name}'"
+        err_msg = proc.stderr.strip() or proc.stdout.strip()
+        return False, f"Git error: {err_msg}"
+    except (subprocess.SubprocessError, OSError) as exc:
+        return False, f"Failed to execute git checkout: {exc}"
+
+
+def append_task_breakdown(
+    breakdown_text: str,
+    task_title: str,
+    date_str: str,
+    target_dir: Path | str | None = None,
+) -> Path:
+    base_dir = Path(target_dir) if target_dir else Path.cwd()
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = base_dir / f"tasks-{date_str}.md"
+    entry = f"\n\n## Task: {task_title}\n\n{breakdown_text.strip()}\n"
+
+    if file_path.exists():
+        existing = file_path.read_text(encoding="utf-8")
+        file_path.write_text(existing + entry, encoding="utf-8")
+    else:
+        file_path.write_text(f"# Task Breakdowns - {date_str}{entry}", encoding="utf-8")
+
+    return file_path

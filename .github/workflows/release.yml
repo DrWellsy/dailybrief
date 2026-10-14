@@ -1,0 +1,121 @@
+name: Test, Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        run: python -m pytest -v
+
+  build-binaries:
+    name: Build Standalone Binary (${{ matrix.target }})
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows-x64
+            output_name: dailybrief-windows-x64.exe
+          - os: macos-14
+            target: macos-arm64
+            output_name: dailybrief-macos-arm64
+          - os: ubuntu-latest
+            target: linux-x64
+            output_name: dailybrief-linux-x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies & PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build executable with PyInstaller
+        shell: bash
+        run: |
+          pyinstaller --noconfirm --clean --onefile \
+            --name dailybrief \
+            --collect-all rich \
+            --collect-all dailybrief \
+            --hidden-import dailybrief.cli \
+            --hidden-import dailybrief.cache \
+            --hidden-import dailybrief.doctor \
+            --hidden-import dailybrief.scheduler \
+            --hidden-import dailybrief.mcp_server \
+            --hidden-import dailybrief.voice \
+            --hidden-import dailybrief.eod \
+            --hidden-import dailybrief.git_radar \
+            main.py
+
+          mkdir -p release-artifacts
+          if [ -f "dist/dailybrief.exe" ]; then
+            mv dist/dailybrief.exe release-artifacts/${{ matrix.output_name }}
+          elif [ -f "dist/dailybrief" ]; then
+            chmod +x dist/dailybrief
+            mv dist/dailybrief release-artifacts/${{ matrix.output_name }}
+          fi
+
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output_name }}
+          path: release-artifacts/${{ matrix.output_name }}
+
+  release:
+    name: Publish GitHub Release
+    needs: build-binaries
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all built binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: release-binaries
+          merge-multiple: true
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-binaries/*
+          generate_release_notes: true

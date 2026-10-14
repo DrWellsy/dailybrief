@@ -37,3 +37,12 @@ Thumbs.db
 # Environment files
 .env
 .env.*
+
+# Generated briefing and task exports
+brief-*.md
+tasks-*.md
+*.log
+*.mp3
+*.wav
+release-artifacts/
+release-binaries/

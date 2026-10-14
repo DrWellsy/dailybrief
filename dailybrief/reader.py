@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 import warnings
@@ -9,6 +8,15 @@ import warnings
 class Note:
     name: str
     content: str
+
+
+def _read_single_file(path: Path) -> tuple[Path, Note | Exception]:
+    try:
+        raw_content = path.read_bytes()
+        content = _decode_content(raw_content)
+        return path, Note(name=path.name, content=content)
+    except (UnicodeDecodeError, OSError, ValueError) as exc:
+        return path, exc
 
 
 def read_notes(folder_path: str | Path) -> list[Note]:
@@ -32,20 +40,31 @@ def read_notes(folder_path: str | Path) -> list[Note]:
     if not candidates:
         raise ValueError(f"Klasorde .md veya .txt dosyasi bulunamadi: {source}")
 
-    notes: list[Note] = []
-    for path in candidates:
-        try:
-            raw_content = path.read_bytes()
-            content = _decode_content(raw_content)
-        except (UnicodeDecodeError, OSError, ValueError) as exc:
+    if len(candidates) == 1:
+        path, result = _read_single_file(candidates[0])
+        if isinstance(result, Exception):
             warnings.warn(
-                f"Dosya okunamadi, atlandi: {path.name} ({exc})",
+                f"Dosya okunamadi, atlandi: {path.name} ({result})",
+                category=UserWarning,
+                stacklevel=2,
+            )
+            return []
+        return [result]
+
+    notes: list[Note] = []
+    max_workers = min(16, len(candidates))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(_read_single_file, candidates))
+
+    for path, result in results:
+        if isinstance(result, Exception):
+            warnings.warn(
+                f"Dosya okunamadi, atlandi: {path.name} ({result})",
                 category=UserWarning,
                 stacklevel=2,
             )
             continue
-
-        notes.append(Note(name=path.name, content=content))
+        notes.append(result)
 
     return notes
 
